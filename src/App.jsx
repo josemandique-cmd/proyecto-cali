@@ -97,14 +97,7 @@ function App() {
   useEffect(() => {
     const fetchCatalogs = async () => {
       try {
-        const [
-          { data: motivos },
-          { data: familias },
-          { data: estados },
-          { data: armado },
-          { data: tipos },
-          { data: condiciones }
-        ] = await Promise.all([
+        const results = await Promise.all([
           supabase.from('MA_MOTIVOS_DEVOLUCION').select('*'),
           supabase.from('MA_FAMILIA_PRODUCTO').select('*'),
           supabase.from('MA_ESTADO_EMBALAJE').select('*'),
@@ -116,19 +109,37 @@ function App() {
           supabase.from('MA_TIPO_LI').select('*')
         ]);
 
-        setCatalogs({
-          motivos: motivos || [],
-          familias: familias || [],
-          estadosEmbalaje: estados || [],
-          armado: armado || [],
-          tiposEmbalaje: tipos || [],
-          condiciones: condiciones || [],
-          tiposLi: tipoLi || []
+        // Log de errores por tabla
+        results.forEach((res, i) => {
+          if (res.error) console.error(`Error en tabla ${i}:`, res.error);
         });
-        setRulesMatrix(rules || []);
-        setFamilyConditions(famCond || []);
+
+        const [motivos, familias, estados, armado, tipos, condiciones, rules, famCond, tipoLi] = results;
+
+        setCatalogs({
+          motivos: motivos.data || [],
+          familias: familias.data || [],
+          estadosEmbalaje: estados.data || [],
+          armado: armado.data || [],
+          tiposEmbalaje: tipos.data || [],
+          condiciones: condiciones.data || [],
+          tiposLi: tipoLi.data || []
+        });
+        console.log("[DEBUG] Catálogos cargados:", {
+          motivos: motivos.data,
+          familias: familias.data,
+          estados: estados.data,
+          tipoLi: tipoLi.data
+        });
+        setRulesMatrix(rules.data || []);
+        setFamilyConditions(famCond.data || []);
+        
+        if (results.some(r => r.error)) {
+          setError("Error parcial cargando tablas. Revisa las políticas RLS en Supabase.");
+        }
       } catch (e) {
-        console.error("Error cargando catálogos:", e);
+        console.error("Error crítico cargando catálogos:", e);
+        setError("Error de conexión con Supabase.");
       }
     };
 
@@ -439,6 +450,7 @@ function App() {
               </motion.form>
             ) : returnStep === 1 ? (
               <motion.form key="ret1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onSubmit={handleSubmitReturn}>
+                {error && <div className="error-text" style={{ background: '#fff1f2', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>⚠️ {error}</div>}
                 <div className="info-box">OF: {ofNumber}</div>
                 
                 {/* Tipo de Devolución */}
