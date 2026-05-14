@@ -397,7 +397,7 @@ function App() {
         const requestBody = { codigoOrdenFlete: parseInt(ofNumber) };
         console.log("[API PDA] Enviando request:", requestBody);
 
-        const response = await fetch('https://restservices-qa.starken.cl/apiqa/starkenservices/rest/consultarLinkImagenFotosPDAAcuso', {
+        const response = await fetch('/apiqa/starkenservices/rest/consultarLinkImagenFotosPDAAcuso', {
           method: 'POST',
           headers: { 'rut': 'CHN_TCK', 'clave': 'Starken2026', 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody)
