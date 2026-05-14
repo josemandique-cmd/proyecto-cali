@@ -16,7 +16,7 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon;
 
 function App() {
-  const [view, setView] = useState('register'); // 'register' o 'lookup'
+  const [view, setView] = useState('register'); // 'register', 'lookup', 'return'
   const [step, setStep] = useState(0); 
   const [ofNumber, setOfNumber] = useState('');
   const [intento, setIntento] = useState(null);
@@ -44,6 +44,25 @@ function App() {
   const [ciudadesList, setCiudadesList] = useState([]);
   const [mapCoords, setMapCoords] = useState(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
+  
+  // Estados para Devolución
+  const [returnStep, setReturnStep] = useState(0);
+  const [returnForm, setReturnForm] = useState({
+    motivo: '',
+    familia: '',
+    estadoEmbalaje: '',
+    armado: '',
+    tipoEmbalaje: '',
+    condiciones: []
+  });
+  const [catalogs, setCatalogs] = useState({
+    motivos: [],
+    familias: [],
+    estadosEmbalaje: [],
+    armado: [],
+    tiposEmbalaje: [],
+    condiciones: []
+  });
 
   useEffect(() => {
     if (dirCorrecta === 'no' && nuevaDireccion && nuevaNumeracion && nuevaComuna) {
@@ -70,6 +89,41 @@ function App() {
       return () => clearTimeout(timeoutId);
     }
   }, [nuevaDireccion, nuevaNumeracion, nuevaComuna, dirCorrecta, comunasList]);
+
+  useEffect(() => {
+    const fetchCatalogs = async () => {
+      try {
+        const [
+          { data: motivos },
+          { data: familias },
+          { data: estados },
+          { data: armado },
+          { data: tipos },
+          { data: condiciones }
+        ] = await Promise.all([
+          supabase.from('MA_MOTIVOS_DEVOLUCION').select('*').order('nombre'),
+          supabase.from('MA_FAMILIA_PRODUCTO').select('*').order('nombre'),
+          supabase.from('MA_ESTADO_EMBALAJE').select('*').order('nombre'),
+          supabase.from('MA_TIPO_AMARDO').select('*').order('nombre'),
+          supabase.from('MA_TIPO_EMBALAJE').select('*').order('nombre'),
+          supabase.from('MA_CONDICIONES_PRODUCTO').select('*').order('nombre')
+        ]);
+
+        setCatalogs({
+          motivos: motivos || [],
+          familias: familias || [],
+          estadosEmbalaje: estados || [],
+          armado: armado || [],
+          tiposEmbalaje: tipos || [],
+          condiciones: condiciones || []
+        });
+      } catch (e) {
+        console.error("Error cargando catálogos:", e);
+      }
+    };
+
+    fetchCatalogs();
+  }, []);
 
   const handleNext = async (e) => {
     e.preventDefault();
@@ -266,11 +320,70 @@ function App() {
     } catch (err) { setError(err.message); } finally { setLoading(false); }
   };
 
+  const handleSubmitReturn = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const now = new Date().toISOString();
+      const inserts = [];
+      
+      if (returnForm.motivo) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 7, DESCRIPCION: 'MOTIVO_DEVOLUCION', VALOR: returnForm.motivo, confirmacion: now, created_at: now, modificacion: now });
+      if (returnForm.familia) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 8, DESCRIPCION: 'FAMILIA_PRODUCTO', VALOR: returnForm.familia, confirmacion: now, created_at: now, modificacion: now });
+      if (returnForm.estadoEmbalaje) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 9, DESCRIPCION: 'ESTADO_EMBALAJE', VALOR: returnForm.estadoEmbalaje, confirmacion: now, created_at: now, modificacion: now });
+      if (returnForm.armado) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 10, DESCRIPCION: 'ARMADO', VALOR: returnForm.armado, confirmacion: now, created_at: now, modificacion: now });
+      if (returnForm.tipoEmbalaje) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 11, DESCRIPCION: 'TIPO_EMBALAJE', VALOR: returnForm.tipoEmbalaje, confirmacion: now, created_at: now, modificacion: now });
+      
+      if (returnForm.condiciones.length > 0) {
+        inserts.push({ 
+          OF: parseInt(ofNumber), 
+          TIPO_CAMPO: 12, 
+          DESCRIPCION: 'CONDICION_PRODUCTO', 
+          VALOR: returnForm.condiciones.join(','), 
+          confirmacion: now, 
+          created_at: now, 
+          modificacion: now 
+        });
+      }
+
+      const { error: dbError } = await supabase.from('MV_RESPUESTA_ENCUESTA').insert(inserts);
+      if (dbError) throw dbError;
+      
+      setReturnStep(2); // Éxito
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
+  };
+
+  const handleNextReturn = async (e) => {
+    e.preventDefault();
+    if (!ofNumber) return setError('Por favor ingresa un número de OF');
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: ofD, error: ofE } = await supabase
+        .from('ORDEN_FLETE')
+        .select('ODFLCODIGO')
+        .eq('ODFLCODIGO', parseInt(ofNumber))
+        .single();
+      
+      if (ofE || !ofD) throw new Error('Número de OF no encontrado');
+      
+      setReturnStep(1);
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
+  };
+
   const handleReset = () => {
     setOfNumber(''); setIntento(null); setRechazo(null); setStep(0);
     setError(null); setLookupResult(null); setApiGestiones([]); setOfData(null);
     setIsDirIncorrectaFlow(false); setDireccionActual(null); setDirCorrecta(null);
     setNuevaDireccion(''); setNuevaNumeracion(''); setNuevaComuna(''); setNuevaRegion(''); setMapCoords(null);
+    setReturnStep(0);
+    setReturnForm({
+      motivo: '',
+      familia: '',
+      estadoEmbalaje: '',
+      armado: '',
+      tipoEmbalaje: '',
+      condiciones: []
+    });
   };
 
   const filteredComunas = nuevaRegion ? comunasList.filter(c => {
@@ -284,13 +397,101 @@ function App() {
         <h1 style={{ letterSpacing: '-1.5px' }}>starken</h1>
         <div className="tab-container">
           <button className={`tab-btn ${view === 'register' ? 'active' : ''}`} onClick={() => { setView('register'); handleReset(); }}><PlusCircle size={16} /> NUEVA</button>
+          <button className={`tab-btn ${view === 'return' ? 'active' : ''}`} onClick={() => { setView('return'); handleReset(); }}><Undo2 size={16} /> DEVOLUCIÓN</button>
           <button className={`tab-btn ${view === 'lookup' ? 'active' : ''}`} onClick={() => { setView('lookup'); handleReset(); }}><Search size={16} /> CONSULTAR</button>
         </div>
       </div>
 
       <div className="content">
         <AnimatePresence mode="wait">
-          {view === 'register' ? (
+          {view === 'return' ? (
+            /* --- DEVOLUCIÓN --- */
+            returnStep === 0 ? (
+              <motion.form key="ret0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onSubmit={handleNextReturn}>
+                <div className="field-group"><label className="label">Ingresar OF para devolución</label>
+                  <input type="number" value={ofNumber} onChange={(e) => setOfNumber(e.target.value)} />
+                </div>
+                <button className="submit-btn" type="submit" disabled={loading}>{loading ? 'VALIDANDO...' : 'SIGUIENTE'}</button>
+                {error && <p className="error-text">{error}</p>}
+              </motion.form>
+            ) : returnStep === 1 ? (
+              <motion.form key="ret1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onSubmit={handleSubmitReturn}>
+                <div className="info-box">OF: {ofNumber}</div>
+                
+                {/* Motivo */}
+                <div className="field-group"><label className="label">Motivo de Devolución</label>
+                  <select value={returnForm.motivo} onChange={(e) => setReturnForm({...returnForm, motivo: e.target.value})}>
+                    <option value="">Selecciona un motivo...</option>
+                    {catalogs.motivos.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                  </select>
+                </div>
+
+                {/* Familia */}
+                <div className="field-group"><label className="label">Familia de Producto</label>
+                  <select value={returnForm.familia} onChange={(e) => setReturnForm({...returnForm, familia: e.target.value})}>
+                    <option value="">Selecciona una familia...</option>
+                    {catalogs.familias.map(f => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+                  </select>
+                </div>
+
+                {/* Estado Embalaje */}
+                <div className="field-group"><label className="label">Estado del Embalaje</label>
+                  <select value={returnForm.estadoEmbalaje} onChange={(e) => setReturnForm({...returnForm, estadoEmbalaje: e.target.value})}>
+                    <option value="">Selecciona un estado...</option>
+                    {catalogs.estadosEmbalaje.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                  </select>
+                </div>
+
+                {/* Armado (Condicional: Solo Muebles) */}
+                {catalogs.familias.find(f => f.id.toString() === returnForm.familia)?.nombre === 'Mueble' && (
+                  <div className="field-group"><label className="label">Armado</label>
+                    <select value={returnForm.armado} onChange={(e) => setReturnForm({...returnForm, armado: e.target.value})}>
+                      <option value="">Selecciona...</option>
+                      {catalogs.armado.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {/* Tipo Embalaje */}
+                <div className="field-group"><label className="label">Tipo de Embalaje</label>
+                  <select value={returnForm.tipoEmbalaje} onChange={(e) => setReturnForm({...returnForm, tipoEmbalaje: e.target.value})}>
+                    <option value="">Selecciona un tipo...</option>
+                    {catalogs.tiposEmbalaje.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                  </select>
+                </div>
+
+                {/* Condición del Producto (Checkboxes) */}
+                <div className="field-group">
+                  <label className="label">Condición del Producto</label>
+                  <div className="checkbox-grid">
+                    {catalogs.condiciones.map(c => (
+                      <label key={c.id} className="checkbox-item">
+                        <input type="checkbox" checked={returnForm.condiciones.includes(c.id)} 
+                          onChange={(e) => {
+                            const newConds = e.target.checked 
+                              ? [...returnForm.condiciones, c.id]
+                              : returnForm.condiciones.filter(id => id !== c.id);
+                            setReturnForm({...returnForm, condiciones: newConds});
+                          }} 
+                        />
+                        <span>{c.nombre}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <button className="submit-btn" type="submit" disabled={loading || !returnForm.motivo || !returnForm.familia}>
+                  {loading ? 'GUARDANDO...' : 'CONFIRMAR DEVOLUCIÓN'}
+                </button>
+              </motion.form>
+            ) : (
+              <motion.div key="ret2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="success-screen">
+                <CheckCircle2 size={48} color="var(--starken-green)" />
+                <h1>¡Devolución Registrada!</h1>
+                <button className="submit-btn" onClick={handleReset}>NUEVA GESTIÓN</button>
+              </motion.div>
+            )
+          ) : view === 'register' ? (
             /* --- REGISTRO --- */
             step === 0 ? (
               <motion.form key="reg0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onSubmit={handleNext}>
