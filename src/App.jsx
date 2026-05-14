@@ -619,11 +619,13 @@ function App() {
                       <select value={returnForm.comuna} onChange={(e) => setReturnForm({...returnForm, comuna: e.target.value, agencia: null})}>
                         <option value="">Selecciona comuna...</option>
                         {comunasList.filter(c => {
-                          const cId = getVal(c, ['CIUCODIGO', 'CIUDCODIGO', 'CIUD_CODIGO', 'id']);
+                          const cId = getVal(c, ['CIUDCODIGO', 'CIUCODIGO', 'id']);
                           if (!cId) return false;
-                          const ciudad = ciudadesList.find(city => getVal(city, ['CIUCODIGO', 'CIUDCODIGO', 'CIUD_CODIGO', 'id'])?.toString() === cId.toString());
-                          return ciudad && getVal(ciudad, ['REGCODIGO', 'REGI_CODIGO', 'id'])?.toString() === returnForm.region;
-                        }).map((c, i) => <option key={getVal(c, ['COMCODIGO', 'COMUCODIGO', 'COMU_CODIGO', 'id']) || i} value={getVal(c, ['COMCODIGO', 'COMUCODIGO', 'COMU_CODIGO', 'id'])}>{getVal(c, ['COMNOMBRE', 'COMUNOMBRE', 'nombre', 'descripcion'])}</option>)}
+                          const ciudad = ciudadesList.find(city => getVal(city, ['CIUDCODIGO', 'CIUCODIGO', 'id'])?.toString() === cId.toString());
+                          // El vínculo en la tabla Ciudad es CIUDREGION
+                          const regId = ciudad ? getVal(ciudad, ['CIUDREGION', 'REGCODIGO', 'id']) : null;
+                          return regId?.toString() === returnForm.region;
+                        }).map((c, i) => <option key={getVal(c, ['COMUCODIGO', 'COMCODIGO', 'id']) || i} value={getVal(c, ['COMUCODIGO', 'COMCODIGO', 'id'])}>{getVal(c, ['COMUNOMBRE', 'COMNOMBRE', 'nombre', 'descripcion'])}</option>)}
                       </select>
                     </div>
 
