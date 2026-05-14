@@ -92,13 +92,13 @@ function App() {
         setCiudadesList(ciu.data || []);
 
         if (reg.data && reg.data.length > 0) {
-          console.log("[DEBUG] Estructura de MA_REGION:", Object.keys(reg.data[0]));
+          console.log("[DEBUG] Estructura de MA_REGION:", Object.keys(reg.data[0]).join(", "));
         }
         if (com.data && com.data.length > 0) {
-          console.log("[DEBUG] Estructura de MA_COMUNA:", Object.keys(com.data[0]));
+          console.log("[DEBUG] Estructura de MA_COMUNA:", Object.keys(com.data[0]).join(", "));
         }
         if (ciu.data && ciu.data.length > 0) {
-          console.log("[DEBUG] Estructura de MA_CIUDAD:", Object.keys(ciu.data[0]));
+          console.log("[DEBUG] Estructura de MA_CIUDAD:", Object.keys(ciu.data[0]).join(", "));
         }
       } catch (e) {
         console.error("Error crítico en fetchLocations:", e);
