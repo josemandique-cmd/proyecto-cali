@@ -101,12 +101,12 @@ function App() {
           { data: tipos },
           { data: condiciones }
         ] = await Promise.all([
-          supabase.from('MA_MOTIVOS_DEVOLUCION').select('*').order('nombre'),
-          supabase.from('MA_FAMILIA_PRODUCTO').select('*').order('nombre'),
-          supabase.from('MA_ESTADO_EMBALAJE').select('*').order('nombre'),
-          supabase.from('MA_TIPO_AMARDO').select('*').order('nombre'),
-          supabase.from('MA_TIPO_EMBALAJE').select('*').order('nombre'),
-          supabase.from('MA_CONDICIONES_PRODUCTO').select('*').order('nombre')
+          supabase.from('MA_MOTIVOS_DEVOLUCION').select('*'),
+          supabase.from('MA_FAMILIA_PRODUCTO').select('*'),
+          supabase.from('MA_ESTADO_EMBALAJE').select('*'),
+          supabase.from('MA_TIPO_AMARDO').select('*'),
+          supabase.from('MA_TIPO_EMBALAJE').select('*'),
+          supabase.from('MA_CONDICIONES_PRODUCTO').select('*')
         ]);
 
         setCatalogs({
@@ -361,10 +361,9 @@ function App() {
       const { data: ofD, error: ofE } = await supabase
         .from('ORDEN_FLETE')
         .select('ODFLCODIGO')
-        .eq('ODFLCODIGO', parseInt(ofNumber))
-        .single();
+        .eq('ODFLCODIGO', parseInt(ofNumber));
       
-      if (ofE || !ofD) throw new Error('Número de OF no encontrado');
+      if (ofE || !ofD || ofD.length === 0) throw new Error('Número de OF no encontrado');
       
       setReturnStep(1);
     } catch (err) { setError(err.message); } finally { setLoading(false); }
@@ -422,7 +421,7 @@ function App() {
                 <div className="field-group"><label className="label">Motivo de Devolución</label>
                   <select value={returnForm.motivo} onChange={(e) => setReturnForm({...returnForm, motivo: e.target.value})}>
                     <option value="">Selecciona un motivo...</option>
-                    {catalogs.motivos.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                    {catalogs.motivos.map(m => <option key={m.id} value={m.id}>{m.nombre || m.nombre || m.descripcion || m.Descripcion}</option>)}
                   </select>
                 </div>
 
@@ -430,7 +429,7 @@ function App() {
                 <div className="field-group"><label className="label">Familia de Producto</label>
                   <select value={returnForm.familia} onChange={(e) => setReturnForm({...returnForm, familia: e.target.value})}>
                     <option value="">Selecciona una familia...</option>
-                    {catalogs.familias.map(f => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+                    {catalogs.familias.map(f => <option key={f.id} value={f.id}>{f.nombre || f.nombre || f.descripcion || f.Descripcion}</option>)}
                   </select>
                 </div>
 
@@ -438,7 +437,7 @@ function App() {
                 <div className="field-group"><label className="label">Estado del Embalaje</label>
                   <select value={returnForm.estadoEmbalaje} onChange={(e) => setReturnForm({...returnForm, estadoEmbalaje: e.target.value})}>
                     <option value="">Selecciona un estado...</option>
-                    {catalogs.estadosEmbalaje.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                    {catalogs.estadosEmbalaje.map(e => <option key={e.id} value={e.id}>{e.nombre || e.nombre || e.descripcion || e.Descripcion}</option>)}
                   </select>
                 </div>
 
@@ -447,7 +446,7 @@ function App() {
                   <div className="field-group"><label className="label">Armado</label>
                     <select value={returnForm.armado} onChange={(e) => setReturnForm({...returnForm, armado: e.target.value})}>
                       <option value="">Selecciona...</option>
-                      {catalogs.armado.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                      {catalogs.armado.map(a => <option key={a.id} value={a.id}>{a.nombre || a.nombre || a.descripcion || a.Descripcion}</option>)}
                     </select>
                   </div>
                 )}
@@ -456,7 +455,7 @@ function App() {
                 <div className="field-group"><label className="label">Tipo de Embalaje</label>
                   <select value={returnForm.tipoEmbalaje} onChange={(e) => setReturnForm({...returnForm, tipoEmbalaje: e.target.value})}>
                     <option value="">Selecciona un tipo...</option>
-                    {catalogs.tiposEmbalaje.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+                    {catalogs.tiposEmbalaje.map(t => <option key={t.id} value={t.id}>{t.nombre || t.nombre || t.descripcion || t.Descripcion}</option>)}
                   </select>
                 </div>
 
@@ -474,7 +473,7 @@ function App() {
                             setReturnForm({...returnForm, condiciones: newConds});
                           }} 
                         />
-                        <span>{c.nombre}</span>
+                        <span>{c.nombre || c.nombre || c.descripcion || c.Descripcion}</span>
                       </label>
                     ))}
                   </div>
