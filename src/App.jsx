@@ -392,21 +392,37 @@ function App() {
 
       setLookupResult(dEnc);
 
-      // 3. API STAKEN (Encapsulada para que no rompa el flujo si falla)
+      // 3. API STAKEN (con logs completos de diagnóstico)
       try {
+        const requestBody = { codigoOrdenFlete: parseInt(ofNumber) };
+        console.log("[API PDA] Enviando request:", requestBody);
+
         const response = await fetch('https://restservices-qa.starken.cl/apiqa/starkenservices/rest/consultarLinkImagenFotosPDAAcuso', {
           method: 'POST',
           headers: { 'rut': 'CHN_TCK', 'clave': 'Starken2026', 'Content-Type': 'application/json' },
-          body: JSON.stringify({ codigoOrdenFlete: parseInt(ofNumber) })
+          body: JSON.stringify(requestBody)
         });
 
-        if (response.ok) {
-          const res = await response.json();
-          if (res && res.gestiones) setApiGestiones(res.gestiones);
+        console.log("[API PDA] Status HTTP:", response.status, response.statusText);
+        
+        const rawText = await response.text();
+        console.log("[API PDA] Respuesta RAW:", rawText);
+
+        try {
+          const res = JSON.parse(rawText);
+          console.log("[API PDA] JSON Parseado:", res);
+          console.log("[API PDA] gestiones:", res?.gestiones);
+          if (res && res.gestiones) {
+            setApiGestiones(res.gestiones);
+            console.log("[API PDA] Total gestiones cargadas:", res.gestiones.length);
+          } else {
+            console.warn("[API PDA] No se encontró el campo 'gestiones' en la respuesta");
+          }
+        } catch (parseErr) {
+          console.error("[API PDA] Error al parsear JSON:", parseErr);
         }
       } catch (apiErr) {
-        console.warn("Error al conectar con API Starken (PDA):", apiErr);
-        // No lanzamos el error para que la info de Supabase sea visible
+        console.error("[API PDA] Error de red/CORS:", apiErr);
       }
     } catch (err) { 
       setError(err.message); 
