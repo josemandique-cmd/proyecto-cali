@@ -392,18 +392,27 @@ function App() {
 
       setLookupResult(dEnc);
 
-      // 3. API STAKEN
-      const response = await fetch('https://restservices-qa.starken.cl/apiqa/starkenservices/rest/consultarLinkImagenFotosPDAAcuso', {
-        method: 'POST',
-        headers: { 'rut': 'CHN_TCK', 'clave': 'Starken2026', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigoOrdenFlete: parseInt(ofNumber) })
-      });
+      // 3. API STAKEN (Encapsulada para que no rompa el flujo si falla)
+      try {
+        const response = await fetch('https://restservices-qa.starken.cl/apiqa/starkenservices/rest/consultarLinkImagenFotosPDAAcuso', {
+          method: 'POST',
+          headers: { 'rut': 'CHN_TCK', 'clave': 'Starken2026', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ codigoOrdenFlete: parseInt(ofNumber) })
+        });
 
-      if (response.ok) {
-        const res = await response.json();
-        if (res && res.gestiones) setApiGestiones(res.gestiones);
+        if (response.ok) {
+          const res = await response.json();
+          if (res && res.gestiones) setApiGestiones(res.gestiones);
+        }
+      } catch (apiErr) {
+        console.warn("Error al conectar con API Starken (PDA):", apiErr);
+        // No lanzamos el error para que la info de Supabase sea visible
       }
-    } catch (err) { setError(err.message); } finally { setLoading(false); }
+    } catch (err) { 
+      setError(err.message); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const getFilteredGestion = (type) => {
