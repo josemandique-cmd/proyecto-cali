@@ -54,7 +54,10 @@ function App() {
     armado: '',
     tipoEmbalaje: '',
     tipoLi: '',
-    condiciones: []
+    condiciones: [],
+    region: '',
+    comuna: '',
+    agencia: null
   });
   const [catalogs, setCatalogs] = useState({
     motivos: [],
@@ -67,6 +70,32 @@ function App() {
   });
   const [rulesMatrix, setRulesMatrix] = useState([]);
   const [familyConditions, setFamilyConditions] = useState([]);
+  const [agenciasList, setAgenciasList] = useState([]);
+  const [mapCenter, setMapCenter] = useState([-33.4489, -70.6693]); // Santiago por defecto
+
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const [reg, com, ciu] = await Promise.all([
+          supabase.from('MA_REGION').select('*'),
+          supabase.from('MA_COMUNA').select('*'),
+          supabase.from('MA_CIUDAD').select('*')
+        ]);
+        
+        if (reg.error) console.error("Error cargando regiones:", reg.error);
+        if (com.error) console.error("Error cargando comunas:", com.error);
+        
+        console.log("[DEBUG] Ubicaciones cargadas:", { regiones: reg.data?.length, comunas: com.data?.length });
+        
+        setRegionesList(reg.data || []);
+        setComunasList(com.data || []);
+        setCiudadesList(ciu.data || []);
+      } catch (e) {
+        console.error("Error crítico en fetchLocations:", e);
+      }
+    };
+    fetchLocations();
+  }, []);
 
   useEffect(() => {
     if (dirCorrecta === 'no' && nuevaDireccion && nuevaNumeracion && nuevaComuna) {
@@ -145,6 +174,27 @@ function App() {
 
     fetchCatalogs();
   }, []);
+
+  useEffect(() => {
+    if (view === 'return' && returnForm.comuna) {
+      const fetchAgencias = async () => {
+        const { data } = await supabase
+          .from('MA_AGENCIA')
+          .select('*')
+          .eq('COMUCODIGO', returnForm.comuna);
+        
+        const validAgencias = (data || []).filter(a => a.LATITUD && a.LONGITUD);
+        setAgenciasList(validAgencias);
+        
+        if (validAgencias.length > 0) {
+          setMapCenter([parseFloat(validAgencias[0].LATITUD), parseFloat(validAgencias[0].LONGITUD)]);
+        }
+      };
+      fetchAgencias();
+    } else {
+      setAgenciasList([]);
+    }
+  }, [returnForm.comuna, view]);
 
   const getAvailableOptions = (fieldName) => {
     switch(fieldName) {
@@ -367,6 +417,7 @@ function App() {
       if (returnForm.armado) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 10, DESCRIPCION: 'ARMADO', VALOR: returnForm.armado, confirmacion: now, created_at: now, modificacion: now });
       if (returnForm.tipoEmbalaje) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 11, DESCRIPCION: 'TIPO_EMBALAJE', VALOR: returnForm.tipoEmbalaje, confirmacion: now, created_at: now, modificacion: now });
       if (returnForm.tipoLi) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 13, DESCRIPCION: 'TIPO_DEVOLUCION', VALOR: returnForm.tipoLi, confirmacion: now, created_at: now, modificacion: now });
+      if (returnForm.agencia) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 14, DESCRIPCION: 'AGENCIA_STARKEN', VALOR: returnForm.agencia.AGENCODI, confirmacion: now, created_at: now, modificacion: now });
       
       if (returnForm.condiciones.length > 0) {
         inserts.push({ 
@@ -453,14 +504,6 @@ function App() {
                 {error && <div className="error-text" style={{ background: '#fff1f2', padding: '10px', borderRadius: '8px', marginBottom: '15px' }}>⚠️ {error}</div>}
                 <div className="info-box">OF: {ofNumber}</div>
                 
-                {/* Tipo de Devolución */}
-                <div className="field-group"><label className="label">Tipo de Devolución</label>
-                  <select value={returnForm.tipoLi} onChange={(e) => setReturnForm({...returnForm, tipoLi: e.target.value})}>
-                    <option value="">Selecciona tipo...</option>
-                    {getAvailableOptions('tipoLi').map(t => <option key={t.id} value={t.id}>{t.descripcion || t.Descripcion}</option>)}
-                  </select>
-                </div>
-
                 {/* Familia */}
                 <div className="field-group"><label className="label">Familia de Producto</label>
                   <select value={returnForm.familia} onChange={(e) => setReturnForm({...returnForm, familia: e.target.value})}>
@@ -523,7 +566,75 @@ function App() {
                   </div>
                 </div>
 
-                <button className="submit-btn" type="submit" disabled={loading || !returnForm.motivo || !returnForm.familia}>
+                {/* Tipo de Devolución */}
+                <div className="field-group"><label className="label">Tipo de Devolución</label>
+                  <select value={returnForm.tipoLi} onChange={(e) => setReturnForm({...returnForm, tipoLi: e.target.value})}>
+                    <option value="">Selecciona tipo...</option>
+                    {getAvailableOptions('tipoLi').map(t => <option key={t.id} value={t.id}>{t.descripcion || t.Descripcion}</option>)}
+                  </select>
+                </div>
+
+                {/* --- SECCIÓN DROP-OFF (MAPA) --- */}
+                {returnForm.tipoLi === '1' && (
+                  <div className="dropoff-section" style={{ marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <h3 style={{ fontSize: '0.9rem', marginBottom: '15px', color: 'var(--starken-green)' }}>Selecciona Agencia de Entrega</h3>
+                    
+                    <div className="field-group">
+                      <label className="label">Región</label>
+                      <select value={returnForm.region} onChange={(e) => setReturnForm({...returnForm, region: e.target.value, comuna: '', agencia: null})}>
+                        <option value="">Selecciona región...</option>
+                        {regionesList.map(r => <option key={r.REGI_CODIGO} value={r.REGI_CODIGO}>{r.REGION_NOMBRE || r.nombre || r.descripcion || r.Descripcion}</option>)}
+                      </select>
+                    </div>
+
+                    <div className="field-group">
+                      <label className="label">Comuna</label>
+                      <select value={returnForm.comuna} onChange={(e) => setReturnForm({...returnForm, comuna: e.target.value, agencia: null})}>
+                        <option value="">Selecciona comuna...</option>
+                        {comunasList.filter(c => {
+                          const ciudad = ciudadesList.find(city => city.CIUDCODIGO === c.CIUDCODIGO);
+                          return ciudad && ciudad.REGI_CODIGO.toString() === returnForm.region;
+                        }).map(c => <option key={c.COMUCODIGO} value={c.COMUCODIGO}>{c.COMUNOMBRE || c.nombre || c.descripcion || c.Descripcion}</option>)}
+                      </select>
+                    </div>
+
+                    {returnForm.comuna && (
+                      <div className="map-wrapper" style={{ height: '300px', borderRadius: '12px', overflow: 'hidden', marginTop: '15px', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                        <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
+                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                          <MapUpdater center={mapCenter} />
+                          {agenciasList.map(ag => (
+                            <Marker 
+                              key={ag.AGENCODI} 
+                              position={[parseFloat(ag.LATITUD), parseFloat(ag.LONGITUD)]}
+                              eventHandlers={{
+                                click: () => setReturnForm({...returnForm, agencia: ag})
+                              }}
+                            >
+                              <Popup>
+                                <strong>{ag.AGENDESCRIPCION || `Agencia ${ag.AGENCODI}`}</strong><br />
+                                <button 
+                                  onClick={() => setReturnForm({...returnForm, agencia: ag})}
+                                  style={{ marginTop: '8px', padding: '4px 8px', background: 'var(--starken-green)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                                >
+                                  SELECCIONAR
+                                </button>
+                              </Popup>
+                            </Marker>
+                          ))}
+                        </MapContainer>
+                      </div>
+                    )}
+
+                    {returnForm.agencia && (
+                      <div className="selected-agency" style={{ marginTop: '15px', padding: '10px', background: 'white', borderRadius: '8px', borderLeft: '4px solid var(--starken-green)', fontSize: '0.85rem' }}>
+                        📍 <strong>Seleccionado:</strong> {returnForm.agencia.AGENDESCRIPCION || `Agencia ${returnForm.agencia.AGENCODI}`}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <button className="submit-btn" type="submit" disabled={loading || !returnForm.motivo || !returnForm.familia || (returnForm.tipoLi === '1' && !returnForm.agencia)}>
                   {loading ? 'GUARDANDO...' : 'CONFIRMAR DEVOLUCIÓN'}
                 </button>
               </motion.form>
