@@ -90,6 +90,10 @@ function App() {
         setRegionesList(reg.data || []);
         setComunasList(com.data || []);
         setCiudadesList(ciu.data || []);
+
+        if (reg.data && reg.data.length > 0) {
+          console.log("[DEBUG] Estructura de MA_REGION:", Object.keys(reg.data[0]));
+        }
       } catch (e) {
         console.error("Error crítico en fetchLocations:", e);
       }
@@ -198,8 +202,18 @@ function App() {
 
   const getVal = (obj, keys) => {
     if (!obj) return '';
-    const foundKey = keys.find(k => k in obj || k.toUpperCase() in obj || k.toLowerCase() in obj);
-    return foundKey ? (obj[foundKey] || obj[foundKey.toUpperCase()] || obj[foundKey.toLowerCase()]) : '';
+    // Buscar coincidencia exacta, ignorando case y espacios
+    const allObjKeys = Object.keys(obj);
+    for (const k of keys) {
+      const found = allObjKeys.find(ok => ok.trim().toLowerCase() === k.trim().toLowerCase());
+      if (found) return obj[found];
+    }
+    // Si no hay coincidencia exacta, buscar cualquier key que contenga la palabra clave
+    for (const k of keys) {
+      const found = allObjKeys.find(ok => ok.toLowerCase().includes(k.toLowerCase()));
+      if (found) return obj[found];
+    }
+    return '';
   };
 
   const getAvailableOptions = (fieldName) => {
