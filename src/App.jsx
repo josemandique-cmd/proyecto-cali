@@ -604,7 +604,7 @@ function App() {
                       <label className="label">Región</label>
                       <select value={returnForm.region} onChange={(e) => setReturnForm({...returnForm, region: e.target.value, comuna: '', agencia: null})}>
                         <option value="">Selecciona región...</option>
-                        {regionesList.map((r, i) => <option key={getVal(r, ['REGI_CODIGO', 'codigo', 'id']) || i} value={getVal(r, ['REGI_CODIGO', 'codigo', 'id'])}>{getVal(r, ['REGION_NOMBRE', 'nombre', 'descripcion', 'Descripcion'])}</option>)}
+                        {regionesList.map((r, i) => <option key={getVal(r, ['REGCODIGO', 'REGI_CODIGO', 'codigo', 'id']) || i} value={getVal(r, ['REGCODIGO', 'REGI_CODIGO', 'codigo', 'id'])}>{getVal(r, ['REGNOMBRE', 'REGION_NOMBRE', 'nombre', 'descripcion'])}</option>)}
                       </select>
                     </div>
 
@@ -613,11 +613,11 @@ function App() {
                       <select value={returnForm.comuna} onChange={(e) => setReturnForm({...returnForm, comuna: e.target.value, agencia: null})}>
                         <option value="">Selecciona comuna...</option>
                         {comunasList.filter(c => {
-                          const cId = getVal(c, ['CIUDCODIGO', 'CIUD_CODIGO', 'id']);
+                          const cId = getVal(c, ['CIUCODIGO', 'CIUDCODIGO', 'CIUD_CODIGO', 'id']);
                           if (!cId) return false;
-                          const ciudad = ciudadesList.find(city => getVal(city, ['CIUDCODIGO', 'CIUD_CODIGO', 'id'])?.toString() === cId.toString());
-                          return ciudad && getVal(ciudad, ['REGI_CODIGO', 'REGI_CODIGO', 'id'])?.toString() === returnForm.region;
-                        }).map((c, i) => <option key={getVal(c, ['COMUCODIGO', 'COMU_CODIGO', 'id']) || i} value={getVal(c, ['COMUCODIGO', 'COMU_CODIGO', 'id'])}>{getVal(c, ['COMUNOMBRE', 'nombre', 'descripcion', 'Descripcion'])}</option>)}
+                          const ciudad = ciudadesList.find(city => getVal(city, ['CIUCODIGO', 'CIUDCODIGO', 'CIUD_CODIGO', 'id'])?.toString() === cId.toString());
+                          return ciudad && getVal(ciudad, ['REGCODIGO', 'REGI_CODIGO', 'id'])?.toString() === returnForm.region;
+                        }).map((c, i) => <option key={getVal(c, ['COMCODIGO', 'COMUCODIGO', 'COMU_CODIGO', 'id']) || i} value={getVal(c, ['COMCODIGO', 'COMUCODIGO', 'COMU_CODIGO', 'id'])}>{getVal(c, ['COMNOMBRE', 'COMUNOMBRE', 'nombre', 'descripcion'])}</option>)}
                       </select>
                     </div>
 
