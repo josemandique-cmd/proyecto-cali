@@ -15,6 +15,14 @@ let DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+const MapUpdater = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (center) map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+};
+
 function App() {
   const [view, setView] = useState('register'); // 'register', 'lookup', 'return'
   const [step, setStep] = useState(0); 
