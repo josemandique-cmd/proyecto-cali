@@ -1,0 +1,507 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from './supabaseClient';
+import { CheckCircle2, Truck, AlertCircle, Check, X, ArrowRight, Search, FileText, PlusCircle, MapPin, Calendar, Image as ImageIcon, PackageCheck, Undo2 } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+let DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+L.Marker.prototype.options.icon = DefaultIcon;
+
+function App() {
+  const [view, setView] = useState('register'); // 'register' o 'lookup'
+  const [step, setStep] = useState(0); 
+  const [ofNumber, setOfNumber] = useState('');
+  const [intento, setIntento] = useState(null);
+  const [rechazo, setRechazo] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Estados para la consulta
+  const [lookupResult, setLookupResult] = useState(null);
+  const [associatedMail, setAssociatedMail] = useState('');
+  const [apiGestiones, setApiGestiones] = useState([]);
+  const [ofData, setOfData] = useState(null);
+  const [subView, setSubView] = useState('devolucion');
+
+  // Estados para Dirección Incorrecta (TDEVCODIGO = 3)
+  const [isDirIncorrectaFlow, setIsDirIncorrectaFlow] = useState(false);
+  const [direccionActual, setDireccionActual] = useState(null);
+  const [dirCorrecta, setDirCorrecta] = useState(null);
+  const [nuevaDireccion, setNuevaDireccion] = useState('');
+  const [nuevaNumeracion, setNuevaNumeracion] = useState('');
+  const [nuevaComuna, setNuevaComuna] = useState('');
+  const [nuevaRegion, setNuevaRegion] = useState('');
+  const [comunasList, setComunasList] = useState([]);
+  const [regionesList, setRegionesList] = useState([]);
+  const [ciudadesList, setCiudadesList] = useState([]);
+  const [mapCoords, setMapCoords] = useState(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+
+  useEffect(() => {
+    if (dirCorrecta === 'no' && nuevaDireccion && nuevaNumeracion && nuevaComuna) {
+      const fetchCoords = async () => {
+        setIsGeocoding(true);
+        try {
+          const comunaName = comunasList.find(c => c.COMUCODIGO.toString() === nuevaComuna)?.COMUNOMBRE || '';
+          const query = `${nuevaDireccion} ${nuevaNumeracion}, ${comunaName}, Chile`;
+          const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+          const data = await res.json();
+          if (data && data.length > 0) {
+            setMapCoords([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+          } else {
+            setMapCoords(null);
+          }
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setIsGeocoding(false);
+        }
+      };
+      
+      const timeoutId = setTimeout(fetchCoords, 1000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [nuevaDireccion, nuevaNumeracion, nuevaComuna, dirCorrecta, comunasList]);
+
+  const handleNext = async (e) => {
+    e.preventDefault();
+    if (!ofNumber) return setError('Por favor ingresa un número de OF');
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: ofD, error: ofE } = await supabase
+        .from('ORDEN_FLETE')
+        .select('TDEVCODIGO, DIRECCION, Numeracion, CIUDCODIGO, COMUCODIGO')
+        .eq('ODFLCODIGO', parseInt(ofNumber))
+        .single();
+      if (ofE || !ofD) throw new Error('Número de OF no encontrado');
+
+      const { data: existingAnswers } = await supabase
+        .from('MV_RESPUESTA_ENCUESTA')
+        .select('OF')
+        .eq('OF', parseInt(ofNumber))
+        .limit(1);
+      
+      if (existingAnswers && existingAnswers.length > 0) {
+        throw new Error('Esta OF ya fue gestionada. Dirígete a la pestaña CONSULTAR para ver sus detalles.');
+      }
+
+      setIsDirIncorrectaFlow(false);
+      setDireccionActual(null);
+      setDirCorrecta(null);
+      setMapCoords(null);
+      setNuevaDireccion('');
+      setNuevaNumeracion('');
+      setNuevaComuna('');
+      setNuevaRegion('');
+
+      if (ofD.TDEVCODIGO === 3) {
+        setIsDirIncorrectaFlow(true);
+        const { data: dComuna } = await supabase.from('MA_COMUNA').select('COMUNOMBRE').eq('COMUCODIGO', ofD.COMUCODIGO).single();
+        const { data: dCiudad } = await supabase.from('MA_CIUDAD').select('CIUDNOMBRE, CIUDREGION').eq('CIUDCODIGO', ofD.CIUDCODIGO).single();
+        let regionName = '';
+        if (dCiudad && dCiudad.CIUDREGION) {
+          const { data: dRegion } = await supabase.from('MA_REGION').select('REGNOMBRE').eq('REGCODIGO', dCiudad.CIUDREGION).single();
+          regionName = dRegion?.REGNOMBRE;
+        }
+        
+        setDireccionActual({
+          calle: ofD.DIRECCION,
+          numero: ofD.Numeracion,
+          comuna: dComuna?.COMUNOMBRE,
+          ciudad: dCiudad?.CIUDNOMBRE,
+          region: regionName
+        });
+
+        const { data: allRegiones } = await supabase.from('MA_REGION').select('REGCODIGO, REGNOMBRE').order('REGNOMBRE');
+        if (allRegiones) setRegionesList(allRegiones);
+
+        const { data: allCiudades } = await supabase.from('MA_CIUDAD').select('CIUDCODIGO, CIUDREGION');
+        if (allCiudades) setCiudadesList(allCiudades);
+
+        const { data: allComunas } = await supabase.from('MA_COMUNA').select('COMUCODIGO, COMUNOMBRE, CIUDCODIGO').order('COMUNOMBRE');
+        if (allComunas) setComunasList(allComunas);
+        
+        setStep(3); // Avanzar a vista del mapa en NUEVA
+      } else {
+        const { data: devD, error: devE } = await supabase
+          .from('MA_TIPO_DEVOLUCION')
+          .select('IsRechazo')
+          .eq('id', ofD.TDEVCODIGO)
+          .single();
+        if (devE || !devD || !devD.IsRechazo) throw new Error('Esta OF no puede ser gestionada');
+        setStep(1); // Avanzar a vista de intento/rechazo en NUEVA
+      }
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const now = new Date().toISOString();
+      const { error: dbError } = await supabase
+        .from('MV_RESPUESTA_ENCUESTA')
+        .insert([
+          { OF: parseInt(ofNumber), TIPO_CAMPO: 1, DESCRIPCION: 'CONFIRMAR_INTENTO', VALOR: intento.toUpperCase(), confirmacion: now, created_at: now, modificacion: now },
+          { OF: parseInt(ofNumber), TIPO_CAMPO: 2, DESCRIPCION: 'CONFIRMAR_RECHAZO', VALOR: rechazo.toUpperCase(), confirmacion: now, created_at: now, modificacion: now }
+        ]);
+      if (dbError) throw dbError;
+      setStep(2);
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
+  };
+
+  const handleLookup = async (e) => {
+    e.preventDefault();
+    if (!ofNumber) return setError('Ingresa una OF para buscar');
+    setLoading(true);
+    setError(null);
+    setLookupResult(null);
+    setApiGestiones([]);
+    setOfData(null);
+    
+    try {
+      // 1. Buscamos mail, IDDEV e IDENTR en ORDEN_FLETE
+      const { data: dOf, error: eOf } = await supabase
+        .from('ORDEN_FLETE')
+        .select('mail, IDDEV, IDENTR')
+        .eq('ODFLCODIGO', parseInt(ofNumber))
+        .single();
+
+      if (eOf || !dOf) throw new Error('OF no encontrada en la base de datos');
+      setOfData(dOf);
+      setAssociatedMail(dOf.mail);
+
+      // 2. Buscamos las respuestas en MV_RESPUESTA_ENCUESTA
+      const { data: dEnc, error: eEnc } = await supabase
+        .from('MV_RESPUESTA_ENCUESTA')
+        .select('*')
+        .eq('OF', parseInt(ofNumber))
+        .order('TIPO_CAMPO', { ascending: true });
+      
+      if (!dEnc || dEnc.length === 0) throw new Error('No se encontraron gestiones para esta OF');
+      
+      const comunaAnswer = dEnc.find(r => r.TIPO_CAMPO === 5);
+      if (comunaAnswer && !isNaN(parseInt(comunaAnswer.VALOR))) {
+        const { data: comunaData } = await supabase.from('MA_COMUNA').select('COMUNOMBRE').eq('COMUCODIGO', parseInt(comunaAnswer.VALOR)).single();
+        if (comunaData) {
+          comunaAnswer.VALOR = comunaData.COMUNOMBRE;
+        }
+      }
+
+      setLookupResult(dEnc);
+
+      // 3. API STAKEN
+      const response = await fetch('https://restservices-qa.starken.cl/apiqa/starkenservices/rest/consultarLinkImagenFotosPDAAcuso', {
+        method: 'POST',
+        headers: { 'rut': 'CHN_TCK', 'clave': 'Starken2026', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigoOrdenFlete: parseInt(ofNumber) })
+      });
+
+      if (response.ok) {
+        const res = await response.json();
+        if (res && res.gestiones) setApiGestiones(res.gestiones);
+      }
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
+  };
+
+  const getFilteredGestion = (type) => {
+    if (!ofData || !apiGestiones.length) return null;
+    const targetId = type === 'devolucion' ? 2 : 1;
+    const targetCode = type === 'devolucion' ? parseInt(ofData.IDDEV) : parseInt(ofData.IDENTR);
+    
+    if (!targetCode) return null;
+
+    const match = apiGestiones.find(g => 
+      g.idGestion === targetId && g.codigoProcesoDevolucionOEntrega === targetCode
+    );
+
+    if (!match) return null;
+    return {
+      fecha: match.fechaGestion,
+      coordenadas: match.coordenadas,
+      status: match.descripcionGestion,
+      fotos: (match.fotografias || []).map(f => ({
+        url: f.url.startsWith('http') ? f.url : `https://${f.url}`,
+        desc: f.descripcion
+      }))
+    };
+  };
+
+  const devGestion = getFilteredGestion('devolucion');
+  const entGestion = getFilteredGestion('entrega');
+
+  const handleSaveDir = async (e) => {
+    e.preventDefault();
+    if (dirCorrecta === 'no' && (!nuevaDireccion || !nuevaNumeracion || !nuevaComuna)) {
+      return setError('Completa todos los campos de la nueva dirección');
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const now = new Date().toISOString();
+      const inserts = [
+        { OF: parseInt(ofNumber), TIPO_CAMPO: 3, DESCRIPCION: 'CONFIRMA_DIRECCION', VALOR: dirCorrecta.toUpperCase(), confirmacion: now, created_at: now, modificacion: now }
+      ];
+      
+      if (dirCorrecta === 'no') {
+        inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 4, DESCRIPCION: 'NUEVA_DIRECCION', VALOR: nuevaDireccion, confirmacion: now, created_at: now, modificacion: now });
+        inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 5, DESCRIPCION: 'NUEVA_COMUNA', VALOR: nuevaComuna, confirmacion: now, created_at: now, modificacion: now });
+        inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 6, DESCRIPCION: 'NUEVA_NUMERACION', VALOR: nuevaNumeracion, confirmacion: now, created_at: now, modificacion: now });
+      }
+
+      const { error: dbError } = await supabase.from('MV_RESPUESTA_ENCUESTA').insert(inserts);
+      if (dbError) throw dbError;
+      
+      setStep(2); // Pantalla de éxito
+      setView('register');
+    } catch (err) { setError(err.message); } finally { setLoading(false); }
+  };
+
+  const handleReset = () => {
+    setOfNumber(''); setIntento(null); setRechazo(null); setStep(0);
+    setError(null); setLookupResult(null); setApiGestiones([]); setOfData(null);
+    setIsDirIncorrectaFlow(false); setDireccionActual(null); setDirCorrecta(null);
+    setNuevaDireccion(''); setNuevaNumeracion(''); setNuevaComuna(''); setNuevaRegion(''); setMapCoords(null);
+  };
+
+  const filteredComunas = nuevaRegion ? comunasList.filter(c => {
+    const ciudad = ciudadesList.find(ci => ci.CIUDCODIGO === c.CIUDCODIGO);
+    return ciudad && ciudad.CIUDREGION.toString() === nuevaRegion;
+  }) : comunasList;
+
+  return (
+    <div className="form-card">
+      <div className="header">
+        <h1 style={{ letterSpacing: '-1.5px' }}>starken</h1>
+        <div className="tab-container">
+          <button className={`tab-btn ${view === 'register' ? 'active' : ''}`} onClick={() => { setView('register'); handleReset(); }}><PlusCircle size={16} /> NUEVA</button>
+          <button className={`tab-btn ${view === 'lookup' ? 'active' : ''}`} onClick={() => { setView('lookup'); handleReset(); }}><Search size={16} /> CONSULTAR</button>
+        </div>
+      </div>
+
+      <div className="content">
+        <AnimatePresence mode="wait">
+          {view === 'register' ? (
+            /* --- REGISTRO --- */
+            step === 0 ? (
+              <motion.form key="reg0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onSubmit={handleNext}>
+                <div className="field-group"><label className="label">Ingresar OF para nueva gestión</label>
+                  <input type="number" value={ofNumber} onChange={(e) => setOfNumber(e.target.value)} />
+                </div>
+                <button className="submit-btn" type="submit" disabled={loading}>{loading ? 'VALIDANDO...' : 'COMENZAR'}</button>
+                {error && <p className="error-text">{error}</p>}
+              </motion.form>
+            ) : step === 1 ? (
+              <motion.form key="reg1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onSubmit={handleSubmit}>
+                <div className="info-box">OF: {ofNumber}</div>
+                <div className="field-group"><label className="label">¿Confirma intento de entrega?</label>
+                  <div className="toggle-group">
+                    <button type="button" className={`toggle-btn ${intento === 'si' ? 'active yes' : ''}`} onClick={() => setIntento('si')}>SÍ</button>
+                    <button type="button" className={`toggle-btn ${intento === 'no' ? 'active no' : ''}`} onClick={() => setIntento('no')}>NO</button>
+                  </div>
+                </div>
+                <div className="field-group"><label className="label">¿Confirma rechazo?</label>
+                  <div className="toggle-group">
+                    <button type="button" className={`toggle-btn ${rechazo === 'si' ? 'active yes' : ''}`} onClick={() => setRechazo('si')}>SÍ</button>
+                    <button type="button" className={`toggle-btn ${rechazo === 'no' ? 'active no' : ''}`} onClick={() => setRechazo('no')}>NO</button>
+                  </div>
+                </div>
+                <button className="submit-btn" type="submit" disabled={loading || !intento || !rechazo}>{loading ? 'GUARDANDO...' : 'CONFIRMAR'}</button>
+              </motion.form>
+            ) : step === 3 ? (
+                <motion.div key="reg3" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="result-container">
+                  <div className="info-box" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span>OF: {ofNumber}</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: '500', opacity: 0.7 }}>Destino Actual:</span>
+                    <span style={{ fontSize: '0.9rem', color: 'var(--starken-dark)', marginTop: '4px' }}>
+                      <MapPin size={12}/> {direccionActual?.calle} {direccionActual?.numero}, {direccionActual?.comuna}, {direccionActual?.ciudad}, {direccionActual?.region}
+                    </span>
+                  </div>
+
+                  <form onSubmit={handleSaveDir}>
+                    <div className="field-group"><label className="label">¿La dirección es correcta?</label>
+                      <div className="toggle-group">
+                        <button type="button" className={`toggle-btn ${dirCorrecta === 'si' ? 'active yes' : ''}`} onClick={() => setDirCorrecta('si')}>SÍ</button>
+                        <button type="button" className={`toggle-btn ${dirCorrecta === 'no' ? 'active no' : ''}`} onClick={() => setDirCorrecta('no')}>NO</button>
+                      </div>
+                    </div>
+
+                    <AnimatePresence>
+                      {dirCorrecta === 'no' && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ overflow: 'hidden' }}>
+                          <div className="field-group"><label className="label">Nueva Dirección (Calle)</label>
+                            <input type="text" value={nuevaDireccion} onChange={(e) => setNuevaDireccion(e.target.value)} placeholder="Ej: Av. Principal" style={{width: '100%', padding: '16px', border: '1px solid #ddd', borderRadius: '12px', outline: 'none', transition: 'border 0.3s'}}/>
+                          </div>
+                          <div className="field-group"><label className="label">Nueva Numeración</label>
+                            <input type="text" value={nuevaNumeracion} onChange={(e) => setNuevaNumeracion(e.target.value)} placeholder="Ej: 1234" style={{width: '100%', padding: '16px', border: '1px solid #ddd', borderRadius: '12px', outline: 'none', transition: 'border 0.3s'}}/>
+                          </div>
+                          <div className="field-group"><label className="label">Nueva Región</label>
+                            <select value={nuevaRegion} onChange={(e) => { setNuevaRegion(e.target.value); setNuevaComuna(''); }} style={{width: '100%', padding: '16px', border: '1px solid #ddd', borderRadius: '12px', backgroundColor: '#fafafa', outline: 'none', transition: 'border 0.3s', marginBottom: '16px'}}>
+                              <option value="">Todas las regiones...</option>
+                              {regionesList.map(r => <option key={r.REGCODIGO} value={r.REGCODIGO}>{r.REGNOMBRE}</option>)}
+                            </select>
+                          </div>
+                          <div className="field-group"><label className="label">Nueva Comuna</label>
+                            <select value={nuevaComuna} onChange={(e) => setNuevaComuna(e.target.value)} style={{width: '100%', padding: '16px', border: '1px solid #ddd', borderRadius: '12px', backgroundColor: '#fafafa', outline: 'none', transition: 'border 0.3s'}}>
+                              <option value="">Selecciona una comuna...</option>
+                              {filteredComunas.map(c => <option key={c.COMUCODIGO} value={c.COMUCODIGO}>{c.COMUNOMBRE}</option>)}
+                            </select>
+                          </div>
+
+                          {isGeocoding && <p style={{fontSize:'0.8rem', color:'var(--starken-orange)', fontWeight: '600', marginBottom: '10px'}}>Buscando coordenadas...</p>}
+                          
+                          {mapCoords && (
+                            <div className="map-container" style={{ marginBottom: '20px', height: '200px' }}>
+                              <MapContainer center={mapCoords} zoom={15} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
+                                <Marker position={mapCoords}>
+                                  <Popup>Nueva ubicación detectada</Popup>
+                                </Marker>
+                              </MapContainer>
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <button className="submit-btn" type="submit" disabled={loading || !dirCorrecta || (dirCorrecta === 'no' && (!nuevaDireccion || !nuevaNumeracion || !nuevaComuna))}>
+                      {loading ? 'GUARDANDO...' : 'CONFIRMAR DIRECCIÓN'}
+                    </button>
+                  </form>
+                </motion.div>
+            ) : (
+              <motion.div key="reg2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="success-screen">
+                <CheckCircle2 size={48} color="var(--starken-green)" />
+                <h1>¡Guardado!</h1>
+                <button className="submit-btn" onClick={handleReset}>NUEVA GESTIÓN</button>
+              </motion.div>
+            )
+          ) : (
+            /* --- CONSULTA --- */
+            <motion.div key="lookup" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <form onSubmit={handleLookup}><div className="field-group">
+                <label className="label">Buscar por OF</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input type="number" style={{ flex: 1 }} value={ofNumber} onChange={(e) => setOfNumber(e.target.value)} />
+                  <button className="submit-btn" style={{ width: 'auto', marginTop: 0, padding: '0 20px' }} type="submit" disabled={loading}><Search size={20} /></button>
+                </div>
+              </div></form>
+
+              {error && <p className="error-text">{error}</p>}
+
+              {lookupResult && lookupResult.length > 0 && (
+                <div className="result-container">
+                  <div className="info-box" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span>OF: {ofNumber}</span>
+                    {associatedMail && <span style={{ fontSize: '0.8rem', fontWeight: '500', opacity: 0.7 }}>Email: {associatedMail}</span>}
+                  </div>
+
+                  {/* Sub-pestañas de Consulta */}
+                  <div className="sub-tab-container">
+                    <button className={`sub-tab ${subView === 'devolucion' ? 'active dev' : ''}`} onClick={() => setSubView('devolucion')}>
+                      <Undo2 size={14} /> DEVOLUCIÓN
+                    </button>
+                    <button className={`sub-tab ${subView === 'entrega' ? 'active ent' : ''}`} onClick={() => setSubView('entrega')}>
+                      <PackageCheck size={14} /> ENTREGA
+                    </button>
+                  </div>
+
+                  {subView === 'devolucion' && (
+                    <>
+                      {devGestion ? (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="pda-card">
+                          <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: 'var(--starken-dark)' }}>Evidencia de Devolución</h4>
+                          <div className="pda-meta">
+                            <p style={{ color: 'var(--starken-green)', fontWeight: '800', textTransform: 'uppercase' }}>{devGestion.status}</p>
+                            <p><Calendar size={14} /> {new Date(devGestion.fecha).toLocaleString()}</p>
+                            <p><MapPin size={14} /> {devGestion.coordenadas}</p>
+                          </div>
+                          <div className="map-container">
+                            <iframe width="100%" height="150" style={{ border: 0 }} loading="lazy" src={`https://maps.google.com/maps?q=${devGestion.coordenadas.replace(';', ',')}&t=&z=15&ie=UTF8&iwloc=&output=embed`}></iframe>
+                          </div>
+                          <div className="pda-gallery">
+                            {devGestion.fotos.map((f, i) => (
+                              <div key={i} className="pda-photo-container">
+                                <a href={f.url} target="_blank" rel="noreferrer"><img src={f.url} alt={f.desc} className="pda-thumbnail" /></a>
+                                <span className="pda-photo-desc">{f.desc}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <div className="pda-card" style={{ textAlign: 'center', opacity: 0.6, padding: '40px 20px' }}>
+                          <AlertCircle size={32} style={{ margin: '0 auto 12px' }} />
+                          <p>No se encontró evidencia PDA de devolución para esta OF.</p>
+                        </div>
+                      )}
+
+                      {/* Respuestas de la encuesta (Solo en Devolución) */}
+                      {lookupResult && lookupResult.length > 0 && (
+                        <>
+                          <h3 className="label" style={{ marginTop: '24px', marginBottom: '12px' }}>Gestión Actual (Encuesta)</h3>
+                          {lookupResult.map((res, i) => (
+                            <div key={i} className="result-item">
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span className="label" style={{ fontSize: '0.75rem' }}>{res.DESCRIPCION}</span>
+                                <span className={`badge ${res.VALOR === 'SI' ? 'yes' : 'no'}`}>{res.VALOR}</span>
+                              </div>
+                              <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <FileText size={12} /> Confirmado: {new Date(res.confirmacion).toLocaleString()}
+                              </p>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {subView === 'entrega' && (
+                    <>
+                      {entGestion ? (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="pda-card">
+                          <h4 style={{ margin: '0 0 12px', fontSize: '0.9rem', color: 'var(--starken-dark)' }}>Evidencia de Entrega</h4>
+                          <div className="pda-meta">
+                            <p style={{ color: 'var(--starken-green)', fontWeight: '800', textTransform: 'uppercase' }}>{entGestion.status}</p>
+                            <p><Calendar size={14} /> {new Date(entGestion.fecha).toLocaleString()}</p>
+                            <p><MapPin size={14} /> {entGestion.coordenadas}</p>
+                          </div>
+                          <div className="map-container">
+                            <iframe width="100%" height="150" style={{ border: 0 }} loading="lazy" src={`https://maps.google.com/maps?q=${entGestion.coordenadas.replace(';', ',')}&t=&z=15&ie=UTF8&iwloc=&output=embed`}></iframe>
+                          </div>
+                          <div className="pda-gallery">
+                            {entGestion.fotos.map((f, i) => (
+                              <div key={i} className="pda-photo-container">
+                                <a href={f.url} target="_blank" rel="noreferrer"><img src={f.url} alt={f.desc} className="pda-thumbnail" /></a>
+                                <span className="pda-photo-desc">{f.desc}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <div className="pda-card" style={{ textAlign: 'center', opacity: 0.6, padding: '40px 20px' }}>
+                          <AlertCircle size={32} style={{ margin: '0 auto 12px' }} />
+                          <p>No se encontró evidencia PDA de entrega para esta OF.</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
+export default App;
