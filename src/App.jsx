@@ -94,6 +94,12 @@ function App() {
         if (reg.data && reg.data.length > 0) {
           console.log("[DEBUG] Estructura de MA_REGION:", Object.keys(reg.data[0]));
         }
+        if (com.data && com.data.length > 0) {
+          console.log("[DEBUG] Estructura de MA_COMUNA:", Object.keys(com.data[0]));
+        }
+        if (ciu.data && ciu.data.length > 0) {
+          console.log("[DEBUG] Estructura de MA_CIUDAD:", Object.keys(ciu.data[0]));
+        }
       } catch (e) {
         console.error("Error crítico en fetchLocations:", e);
       }
