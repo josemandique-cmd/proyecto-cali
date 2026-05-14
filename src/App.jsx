@@ -592,8 +592,9 @@ function App() {
                       <select value={returnForm.comuna} onChange={(e) => setReturnForm({...returnForm, comuna: e.target.value, agencia: null})}>
                         <option value="">Selecciona comuna...</option>
                         {comunasList.filter(c => {
+                          if (!c.CIUDCODIGO) return false;
                           const ciudad = ciudadesList.find(city => city.CIUDCODIGO === c.CIUDCODIGO);
-                          return ciudad && ciudad.REGI_CODIGO.toString() === returnForm.region;
+                          return ciudad && ciudad.REGI_CODIGO?.toString() === returnForm.region;
                         }).map(c => <option key={c.COMUCODIGO} value={c.COMUCODIGO}>{c.COMUNOMBRE || c.nombre || c.descripcion || c.Descripcion}</option>)}
                       </select>
                     </div>
