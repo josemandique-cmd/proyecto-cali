@@ -196,16 +196,31 @@ function App() {
   useEffect(() => {
     if (view === 'return' && returnForm.comuna) {
       const fetchAgencias = async () => {
-        const { data } = await supabase
+        // Probamos con COMUCODIGO y COMCODIGO
+        let { data } = await supabase
           .from('MA_AGENCIA')
           .select('*')
           .eq('COMUCODIGO', returnForm.comuna);
         
-        const validAgencias = (data || []).filter(a => a.LATITUD && a.LONGITUD);
+        if (!data || data.length === 0) {
+          const secondTry = await supabase
+            .from('MA_AGENCIA')
+            .select('*')
+            .eq('COMCODIGO', returnForm.comuna);
+          data = secondTry.data;
+        }
+        
+        if (data && data.length > 0) {
+          console.log("[DEBUG] Estructura de MA_AGENCIA:", Object.keys(data[0]).join(", "));
+        }
+
+        const validAgencias = (data || []).filter(a => getVal(a, ['LATITUD', 'LAT']) && getVal(a, ['LONGITUD', 'LON', 'LONG']));
         setAgenciasList(validAgencias);
         
         if (validAgencias.length > 0) {
-          setMapCenter([parseFloat(validAgencias[0].LATITUD), parseFloat(validAgencias[0].LONGITUD)]);
+          const firstLat = getVal(validAgencias[0], ['LATITUD', 'LAT']);
+          const firstLon = getVal(validAgencias[0], ['LONGITUD', 'LON', 'LONG']);
+          setMapCenter([parseFloat(firstLat), parseFloat(firstLon)]);
         }
       };
       fetchAgencias();
@@ -642,25 +657,29 @@ function App() {
                         <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
                           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                           <MapUpdater center={mapCenter} />
-                          {agenciasList.map(ag => (
-                            <Marker 
-                              key={ag.AGENCODI} 
-                              position={[parseFloat(ag.LATITUD), parseFloat(ag.LONGITUD)]}
-                              eventHandlers={{
-                                click: () => setReturnForm({...returnForm, agencia: ag})
-                              }}
-                            >
-                              <Popup>
-                                <strong>{ag.AGENDESCRIPCION || `Agencia ${ag.AGENCODI}`}</strong><br />
-                                <button 
-                                  onClick={() => setReturnForm({...returnForm, agencia: ag})}
-                                  style={{ marginTop: '8px', padding: '4px 8px', background: 'var(--starken-green)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
-                                >
-                                  SELECCIONAR
-                                </button>
-                              </Popup>
-                            </Marker>
-                          ))}
+                          {agenciasList.map(ag => {
+                            const lat = getVal(ag, ['LATITUD', 'LAT']);
+                            const lon = getVal(ag, ['LONGITUD', 'LON', 'LONG']);
+                            return (
+                              <Marker 
+                                key={getVal(ag, ['AGENCODI', 'id'])} 
+                                position={[parseFloat(lat), parseFloat(lon)]}
+                                eventHandlers={{
+                                  click: () => setReturnForm({...returnForm, agencia: ag})
+                                }}
+                              >
+                                <Popup>
+                                  <strong>{getVal(ag, ['AGENDESCRIPCION', 'AGNOMBRE', 'nombre']) || `Agencia ${getVal(ag, ['AGENCODI', 'id'])}`}</strong><br />
+                                  <button 
+                                    onClick={() => setReturnForm({...returnForm, agencia: ag})}
+                                    style={{ marginTop: '8px', padding: '4px 8px', background: 'var(--starken-green)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                                  >
+                                    SELECCIONAR
+                                  </button>
+                                </Popup>
+                              </Marker>
+                            );
+                          })}
                         </MapContainer>
                       </div>
                     )}
