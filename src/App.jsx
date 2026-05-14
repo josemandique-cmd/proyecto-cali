@@ -196,6 +196,12 @@ function App() {
     }
   }, [returnForm.comuna, view]);
 
+  const getVal = (obj, keys) => {
+    if (!obj) return '';
+    const foundKey = keys.find(k => k in obj || k.toUpperCase() in obj || k.toLowerCase() in obj);
+    return foundKey ? (obj[foundKey] || obj[foundKey.toUpperCase()] || obj[foundKey.toLowerCase()]) : '';
+  };
+
   const getAvailableOptions = (fieldName) => {
     switch(fieldName) {
       case 'familia': return catalogs.familias;
@@ -508,7 +514,7 @@ function App() {
                 <div className="field-group"><label className="label">Familia de Producto</label>
                   <select value={returnForm.familia} onChange={(e) => setReturnForm({...returnForm, familia: e.target.value})}>
                     <option value="">Selecciona una familia...</option>
-                    {getAvailableOptions('familia').map(f => <option key={f.id} value={f.id}>{f.nombre || f.descripcion || f.Descripcion}</option>)}
+                    {getAvailableOptions('familia').map(f => <option key={getVal(f, ['id', 'ID'])} value={getVal(f, ['id', 'ID'])}>{getVal(f, ['nombre', 'descripcion', 'REGION_NOMBRE', 'AGENDESCRIPCION', 'COMUNOMBRE'])}</option>)}
                   </select>
                 </div>
 
@@ -516,7 +522,7 @@ function App() {
                 <div className="field-group"><label className="label">Motivo de Devolución</label>
                   <select value={returnForm.motivo} onChange={(e) => setReturnForm({...returnForm, motivo: e.target.value})}>
                     <option value="">Selecciona un motivo...</option>
-                    {getAvailableOptions('motivo').map(m => <option key={m.id} value={m.id}>{m.nombre || m.descripcion || m.Descripcion}</option>)}
+                    {getAvailableOptions('motivo').map(m => <option key={getVal(m, ['id', 'ID'])} value={getVal(m, ['id', 'ID'])}>{getVal(m, ['nombre', 'descripcion', 'REGION_NOMBRE', 'COMUNOMBRE'])}</option>)}
                   </select>
                 </div>
 
@@ -524,16 +530,16 @@ function App() {
                 <div className="field-group"><label className="label">Estado del Embalaje</label>
                   <select value={returnForm.estadoEmbalaje} onChange={(e) => setReturnForm({...returnForm, estadoEmbalaje: e.target.value})}>
                     <option value="">Selecciona un estado...</option>
-                    {getAvailableOptions('estadoEmbalaje').map(e => <option key={e.id} value={e.id}>{e.nombre || e.descripcion || e.Descripcion}</option>)}
+                    {getAvailableOptions('estadoEmbalaje').map(e => <option key={getVal(e, ['id', 'ID'])} value={getVal(e, ['id', 'ID'])}>{getVal(e, ['nombre', 'descripcion'])}</option>)}
                   </select>
                 </div>
 
                 {/* Armado (Condicional: Solo Muebles) */}
-                {catalogs.familias.find(f => f.id.toString() === returnForm.familia)?.nombre === 'Mueble' && (
+                {catalogs.familias.find(f => getVal(f, ['id', 'ID'])?.toString() === returnForm.familia)?.nombre === 'Mueble' && (
                   <div className="field-group"><label className="label">Armado</label>
                     <select value={returnForm.armado} onChange={(e) => setReturnForm({...returnForm, armado: e.target.value})}>
                       <option value="">Selecciona...</option>
-                      {getAvailableOptions('armado').map(a => <option key={a.id} value={a.id}>{a.nombre || a.descripcion || a.Descripcion}</option>)}
+                      {getAvailableOptions('armado').map(a => <option key={getVal(a, ['id', 'ID'])} value={getVal(a, ['id', 'ID'])}>{getVal(a, ['nombre', 'descripcion'])}</option>)}
                     </select>
                   </div>
                 )}
@@ -542,7 +548,7 @@ function App() {
                 <div className="field-group"><label className="label">Tipo de Embalaje</label>
                   <select value={returnForm.tipoEmbalaje} onChange={(e) => setReturnForm({...returnForm, tipoEmbalaje: e.target.value})}>
                     <option value="">Selecciona un tipo...</option>
-                    {getAvailableOptions('tipoEmbalaje').map(t => <option key={t.id} value={t.id}>{t.nombre || t.descripcion || t.Descripcion}</option>)}
+                    {getAvailableOptions('tipoEmbalaje').map(t => <option key={getVal(t, ['id', 'ID'])} value={getVal(t, ['id', 'ID'])}>{getVal(t, ['nombre', 'descripcion'])}</option>)}
                   </select>
                 </div>
 
@@ -551,16 +557,17 @@ function App() {
                   <label className="label">Condición del Producto</label>
                   <div className="checkbox-grid">
                     {getAvailableOptions('condiciones').map(c => (
-                      <label key={c.id} className="checkbox-item">
-                        <input type="checkbox" checked={returnForm.condiciones.includes(c.id)} 
+                      <label key={getVal(c, ['id', 'ID'])} className="checkbox-item">
+                        <input type="checkbox" checked={returnForm.condiciones.includes(getVal(c, ['id', 'ID']))} 
                           onChange={(e) => {
+                            const cId = getVal(c, ['id', 'ID']);
                             const newConds = e.target.checked 
-                              ? [...returnForm.condiciones, c.id]
-                              : returnForm.condiciones.filter(id => id !== c.id);
+                              ? [...returnForm.condiciones, cId]
+                              : returnForm.condiciones.filter(id => id !== cId);
                             setReturnForm({...returnForm, condiciones: newConds});
                           }} 
                         />
-                        <span>{c.nombre || c.descripcion || c.Descripcion}</span>
+                        <span>{getVal(c, ['nombre', 'descripcion'])}</span>
                       </label>
                     ))}
                   </div>
@@ -570,7 +577,7 @@ function App() {
                 <div className="field-group"><label className="label">Tipo de Devolución</label>
                   <select value={returnForm.tipoLi} onChange={(e) => setReturnForm({...returnForm, tipoLi: e.target.value})}>
                     <option value="">Selecciona tipo...</option>
-                    {getAvailableOptions('tipoLi').map(t => <option key={t.id} value={t.id}>{t.descripcion || t.Descripcion}</option>)}
+                    {getAvailableOptions('tipoLi').map(t => <option key={getVal(t, ['id', 'ID'])} value={getVal(t, ['id', 'ID'])}>{getVal(t, ['descripcion', 'nombre'])}</option>)}
                   </select>
                 </div>
 
@@ -583,7 +590,7 @@ function App() {
                       <label className="label">Región</label>
                       <select value={returnForm.region} onChange={(e) => setReturnForm({...returnForm, region: e.target.value, comuna: '', agencia: null})}>
                         <option value="">Selecciona región...</option>
-                        {regionesList.map(r => <option key={r.REGI_CODIGO} value={r.REGI_CODIGO}>{r.REGION_NOMBRE || r.nombre || r.descripcion || r.Descripcion}</option>)}
+                        {regionesList.map(r => <option key={getVal(r, ['REGI_CODIGO', 'id'])} value={getVal(r, ['REGI_CODIGO', 'id'])}>{getVal(r, ['REGION_NOMBRE', 'nombre', 'descripcion', 'Descripcion'])}</option>)}
                       </select>
                     </div>
 
@@ -592,10 +599,11 @@ function App() {
                       <select value={returnForm.comuna} onChange={(e) => setReturnForm({...returnForm, comuna: e.target.value, agencia: null})}>
                         <option value="">Selecciona comuna...</option>
                         {comunasList.filter(c => {
-                          if (!c.CIUDCODIGO) return false;
-                          const ciudad = ciudadesList.find(city => city.CIUDCODIGO === c.CIUDCODIGO);
-                          return ciudad && ciudad.REGI_CODIGO?.toString() === returnForm.region;
-                        }).map(c => <option key={c.COMUCODIGO} value={c.COMUCODIGO}>{c.COMUNOMBRE || c.nombre || c.descripcion || c.Descripcion}</option>)}
+                          const cId = getVal(c, ['CIUDCODIGO', 'id']);
+                          if (!cId) return false;
+                          const ciudad = ciudadesList.find(city => getVal(city, ['CIUDCODIGO', 'id']) === cId);
+                          return ciudad && getVal(ciudad, ['REGI_CODIGO', 'id'])?.toString() === returnForm.region;
+                        }).map(c => <option key={getVal(c, ['COMUCODIGO', 'id'])} value={getVal(c, ['COMUCODIGO', 'id'])}>{getVal(c, ['COMUNOMBRE', 'nombre', 'descripcion', 'Descripcion'])}</option>)}
                       </select>
                     </div>
 
