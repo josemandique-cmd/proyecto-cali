@@ -214,13 +214,19 @@ function App() {
           console.log("[DEBUG] Estructura de MA_AGENCIA:", Object.keys(data[0]).join(", "));
         }
 
-        const validAgencias = (data || []).filter(a => getVal(a, ['LATITUD', 'LAT']) && getVal(a, ['LONGITUD', 'LON', 'LONG']));
+        const validAgencias = (data || []).filter(a => {
+          const lat = getVal(a, ['LATITUD', 'LAT']);
+          const lon = getVal(a, ['LONGITUD', 'LON', 'LONG']);
+          return lat && lon && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon));
+        });
+        
+        console.log(`[DEBUG] Agencias válidas encontradas en ${returnForm.comuna}:`, validAgencias.length);
         setAgenciasList(validAgencias);
         
         if (validAgencias.length > 0) {
-          const firstLat = getVal(validAgencias[0], ['LATITUD', 'LAT']);
-          const firstLon = getVal(validAgencias[0], ['LONGITUD', 'LON', 'LONG']);
-          setMapCenter([parseFloat(firstLat), parseFloat(firstLon)]);
+          const firstLat = parseFloat(getVal(validAgencias[0], ['LATITUD', 'LAT']));
+          const firstLon = parseFloat(getVal(validAgencias[0], ['LONGITUD', 'LON', 'LONG']));
+          setMapCenter([firstLat, firstLon]);
         }
       };
       fetchAgencias();
@@ -658,24 +664,33 @@ function App() {
                           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                           <MapUpdater center={mapCenter} />
                           {agenciasList.map(ag => {
-                            const lat = getVal(ag, ['LATITUD', 'LAT']);
-                            const lon = getVal(ag, ['LONGITUD', 'LON', 'LONG']);
+                            const lat = parseFloat(getVal(ag, ['LATITUD', 'LAT']));
+                            const lon = parseFloat(getVal(ag, ['LONGITUD', 'LON', 'LONG']));
+                            
                             return (
                               <Marker 
                                 key={getVal(ag, ['AGENCODI', 'id'])} 
-                                position={[parseFloat(lat), parseFloat(lon)]}
+                                position={[lat, lon]}
+                                icon={L.divIcon({
+                                  className: 'custom-marker',
+                                  html: `<div style="background: var(--starken-green); width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>`,
+                                  iconSize: [12, 12]
+                                })}
                                 eventHandlers={{
                                   click: () => setReturnForm({...returnForm, agencia: ag})
                                 }}
                               >
                                 <Popup>
-                                  <strong>{getVal(ag, ['AGENDESCRIPCION', 'AGNOMBRE', 'nombre']) || `Agencia ${getVal(ag, ['AGENCODI', 'id'])}`}</strong><br />
-                                  <button 
-                                    onClick={() => setReturnForm({...returnForm, agencia: ag})}
-                                    style={{ marginTop: '8px', padding: '4px 8px', background: 'var(--starken-green)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
-                                  >
-                                    SELECCIONAR
-                                  </button>
+                                  <div style={{ padding: '5px' }}>
+                                    <strong style={{ color: 'var(--starken-green)' }}>{getVal(ag, ['AGENNEMO', 'AGENNEMONICO', 'AGENNOMBRE', 'AGENDESCRIPCION']) || `Agencia ${getVal(ag, ['AGENCODI', 'id'])}`}</strong>
+                                    <p style={{ margin: '5px 0', fontSize: '0.75rem', color: '#666' }}>ID: {getVal(ag, ['AGENCODI', 'id'])}</p>
+                                    <button 
+                                      onClick={() => setReturnForm({...returnForm, agencia: ag})}
+                                      style={{ width: '100%', padding: '6px', background: 'var(--starken-green)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold' }}
+                                    >
+                                      SELECCIONAR
+                                    </button>
+                                  </div>
                                 </Popup>
                               </Marker>
                             );
