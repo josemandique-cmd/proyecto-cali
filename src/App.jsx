@@ -659,44 +659,85 @@ function App() {
                     </div>
 
                     {returnForm.comuna && (
-                      <div className="map-wrapper" style={{ height: '300px', borderRadius: '12px', overflow: 'hidden', marginTop: '15px', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                        <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
-                          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                          <MapUpdater center={mapCenter} />
-                          {agenciasList.map(ag => {
-                            const lat = parseFloat(getVal(ag, ['LATITUD', 'LAT']));
-                            const lon = parseFloat(getVal(ag, ['LONGITUD', 'LON', 'LONG']));
-                            
-                            return (
-                              <Marker 
-                                key={getVal(ag, ['AGENCODI', 'id'])} 
-                                position={[lat, lon]}
-                                icon={L.divIcon({
-                                  className: 'custom-marker',
-                                  html: `<div style="background: var(--starken-green); width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3);"></div>`,
-                                  iconSize: [12, 12]
-                                })}
-                                eventHandlers={{
-                                  click: () => setReturnForm({...returnForm, agencia: ag})
-                                }}
-                              >
-                                <Popup>
-                                  <div style={{ padding: '5px' }}>
-                                    <strong style={{ color: 'var(--starken-green)' }}>{getVal(ag, ['AGENNEMO', 'AGENNEMONICO', 'AGENNOMBRE', 'AGENDESCRIPCION']) || `Agencia ${getVal(ag, ['AGENCODI', 'id'])}`}</strong>
-                                    <p style={{ margin: '5px 0', fontSize: '0.75rem', color: '#666' }}>ID: {getVal(ag, ['AGENCODI', 'id'])}</p>
-                                    <button 
-                                      onClick={() => setReturnForm({...returnForm, agencia: ag})}
-                                      style={{ width: '100%', padding: '6px', background: 'var(--starken-green)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold' }}
-                                    >
-                                      SELECCIONAR
-                                    </button>
+                      <>
+                        <div className="map-wrapper" style={{ height: '300px', borderRadius: '12px', overflow: 'hidden', marginTop: '15px', border: '2px solid white', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                          <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
+                            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                            <MapUpdater center={mapCenter} />
+                            {agenciasList.map(ag => {
+                              const lat = parseFloat(getVal(ag, ['LATITUD', 'LAT']));
+                              const lon = parseFloat(getVal(ag, ['LONGITUD', 'LON', 'LONG']));
+                              
+                              return (
+                                <Marker 
+                                  key={getVal(ag, ['AGENCODI', 'id'])} 
+                                  position={[lat, lon]}
+                                  icon={L.divIcon({
+                                    className: 'custom-marker',
+                                    html: `<div style="background: ${getVal(ag, ['AGENCODI', 'id']) === returnForm.agencia?.AGENCODI ? '#ff0000' : 'var(--starken-green)'}; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.3); transition: all 0.3s;"></div>`,
+                                    iconSize: [14, 14]
+                                  })}
+                                  eventHandlers={{
+                                    click: () => setReturnForm({...returnForm, agencia: ag})
+                                  }}
+                                >
+                                  <Popup>
+                                    <div style={{ padding: '5px' }}>
+                                      <strong style={{ color: 'var(--starken-green)' }}>{getVal(ag, ['AGENNOMBRE', 'AGENDESCRIPCION', 'AGENNEMONICO']) || `Agencia ${getVal(ag, ['AGENCODI', 'id'])}`}</strong>
+                                      <p style={{ margin: '5px 0', fontSize: '0.75rem', color: '#666' }}>{getVal(ag, ['AGENDIRECCION', 'direccion'])}</p>
+                                      <button 
+                                        onClick={() => setReturnForm({...returnForm, agencia: ag})}
+                                        style={{ width: '100%', padding: '6px', background: 'var(--starken-green)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem', fontWeight: 'bold' }}
+                                      >
+                                        SELECCIONAR
+                                      </button>
+                                    </div>
+                                  </Popup>
+                                </Marker>
+                              );
+                            })}
+                          </MapContainer>
+                        </div>
+
+                        {/* Listado de Agencias */}
+                        <div className="agencias-list" style={{ marginTop: '15px', maxHeight: '250px', overflowY: 'auto', borderRadius: '12px', border: '1px solid #e2e8f0', background: 'white' }}>
+                          {agenciasList.length > 0 ? (
+                            agenciasList.map(ag => {
+                              const isSelected = getVal(ag, ['AGENCODI', 'id']) === returnForm.agencia?.AGENCODI;
+                              return (
+                                <div 
+                                  key={getVal(ag, ['AGENCODI', 'id'])}
+                                  onClick={() => {
+                                    setReturnForm({...returnForm, agencia: ag});
+                                    const lat = parseFloat(getVal(ag, ['LATITUD', 'LAT']));
+                                    const lon = parseFloat(getVal(ag, ['LONGITUD', 'LON', 'LONG']));
+                                    setMapCenter([lat, lon]);
+                                  }}
+                                  style={{ 
+                                    padding: '12px 15px', 
+                                    borderBottom: '1px solid #f1f5f9', 
+                                    cursor: 'pointer',
+                                    background: isSelected ? '#f0fdf4' : 'transparent',
+                                    borderLeft: isSelected ? '4px solid var(--starken-green)' : '4px solid transparent',
+                                    transition: 'all 0.2s'
+                                  }}
+                                >
+                                  <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: isSelected ? 'var(--starken-green)' : '#1e293b' }}>
+                                    {getVal(ag, ['AGENNOMBRE', 'AGENDESCRIPCION', 'AGENNEMONICO'])}
                                   </div>
-                                </Popup>
-                              </Marker>
-                            );
-                          })}
-                        </MapContainer>
-                      </div>
+                                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '4px' }}>
+                                    📍 {getVal(ag, ['AGENDIRECCION', 'direccion']) || 'Dirección no disponible'}
+                                  </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                              No se encontraron agencias en esta comuna.
+                            </div>
+                          )}
+                        </div>
+                      </>
                     )}
 
                     {returnForm.agencia && (
