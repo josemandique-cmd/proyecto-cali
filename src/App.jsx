@@ -63,6 +63,8 @@ function App() {
     tiposEmbalaje: [],
     condiciones: []
   });
+  const [rulesMatrix, setRulesMatrix] = useState([]);
+  const [familyConditions, setFamilyConditions] = useState([]);
 
   useEffect(() => {
     if (dirCorrecta === 'no' && nuevaDireccion && nuevaNumeracion && nuevaComuna) {
@@ -106,7 +108,9 @@ function App() {
           supabase.from('MA_ESTADO_EMBALAJE').select('*'),
           supabase.from('MA_TIPO_AMARDO').select('*'),
           supabase.from('MA_TIPO_EMBALAJE').select('*'),
-          supabase.from('MA_CONDICIONES_PRODUCTO').select('*')
+          supabase.from('MA_CONDICIONES_PRODUCTO').select('*'),
+          supabase.from('RL_MATRIZ_PROD_DEV').select('*'),
+          supabase.from('RL_FAMILA_CONDICION').select('*')
         ]);
 
         setCatalogs({
@@ -117,6 +121,8 @@ function App() {
           tiposEmbalaje: tipos || [],
           condiciones: condiciones || []
         });
+        setRulesMatrix(rules || []);
+        setFamilyConditions(famCond || []);
       } catch (e) {
         console.error("Error cargando catálogos:", e);
       }
@@ -124,6 +130,49 @@ function App() {
 
     fetchCatalogs();
   }, []);
+
+  const getAvailableOptions = (fieldName) => {
+    if (rulesMatrix.length === 0) return [];
+    let filteredRules = [...rulesMatrix];
+
+    // Cascada de filtros: Familia es la raíz
+    if (fieldName !== 'familia' && returnForm.familia) {
+      filteredRules = filteredRules.filter(r => (r.id_familia || r.idfamilia)?.toString() === returnForm.familia);
+    }
+    if (!['familia', 'motivo'].includes(fieldName) && returnForm.motivo) {
+      filteredRules = filteredRules.filter(r => (r.id_motivo || r.idmotivo)?.toString() === returnForm.motivo);
+    }
+    if (!['familia', 'motivo', 'estadoEmbalaje'].includes(fieldName) && returnForm.estadoEmbalaje) {
+      filteredRules = filteredRules.filter(r => (r.id_estado_embalaje || r.idestadoembalaje)?.toString() === returnForm.estadoEmbalaje);
+    }
+    if (!['familia', 'motivo', 'estadoEmbalaje', 'armado'].includes(fieldName) && returnForm.armado) {
+      filteredRules = filteredRules.filter(r => (r.armado || r.id_armado)?.toString() === returnForm.armado);
+    }
+
+    const allowedIds = new Set();
+    filteredRules.forEach(r => {
+      if (fieldName === 'familia') allowedIds.add((r.id_familia || r.idfamilia)?.toString());
+      if (fieldName === 'motivo') allowedIds.add((r.id_motivo || r.idmotivo)?.toString());
+      if (fieldName === 'estadoEmbalaje') allowedIds.add((r.id_estado_embalaje || r.idestadoembalaje)?.toString());
+      if (fieldName === 'armado') allowedIds.add((r.armado || r.id_armado)?.toString());
+      if (fieldName === 'tipoEmbalaje') allowedIds.add((r.id_tipo_embalaje || r.idtipoembalaje)?.toString());
+    });
+
+    switch(fieldName) {
+      case 'familia': return catalogs.familias; // Familia no se filtra
+      case 'motivo': return catalogs.motivos.filter(m => allowedIds.has(m.id?.toString()));
+      case 'estadoEmbalaje': return catalogs.estadosEmbalaje.filter(e => allowedIds.has(e.id?.toString()));
+      case 'armado': return catalogs.armado.filter(a => allowedIds.has(a.id?.toString()));
+      case 'tipoEmbalaje': return catalogs.tiposEmbalaje.filter(t => allowedIds.has(t.id?.toString()));
+      case 'condiciones': {
+        const allowedCondIds = familyConditions
+          .filter(fc => (fc.id_familia || fc.idfamilia)?.toString() === returnForm.familia)
+          .map(fc => (fc.id_condicion || fc.idcondicion)?.toString());
+        return catalogs.condiciones.filter(c => allowedCondIds.includes(c.id?.toString()));
+      }
+      default: return [];
+    }
+  };
 
   const handleNext = async (e) => {
     e.preventDefault();
@@ -417,36 +466,36 @@ function App() {
               <motion.form key="ret1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onSubmit={handleSubmitReturn}>
                 <div className="info-box">OF: {ofNumber}</div>
                 
-                {/* Motivo */}
-                <div className="field-group"><label className="label">Motivo de Devolución</label>
-                  <select value={returnForm.motivo} onChange={(e) => setReturnForm({...returnForm, motivo: e.target.value})}>
-                    <option value="">Selecciona un motivo...</option>
-                    {catalogs.motivos.map(m => <option key={m.id} value={m.id}>{m.nombre || m.nombre || m.descripcion || m.Descripcion}</option>)}
+                {/* Familia */}
+                <div className="field-group"><label className="label">Familia de Producto</label>
+                  <select value={returnForm.familia} onChange={(e) => setReturnForm({...returnForm, familia: e.target.value, motivo: '', estadoEmbalaje: '', armado: '', tipoEmbalaje: '', condiciones: []})}>
+                    <option value="">Selecciona una familia...</option>
+                    {getAvailableOptions('familia').map(f => <option key={f.id} value={f.id}>{f.nombre || f.descripcion || f.Descripcion}</option>)}
                   </select>
                 </div>
 
-                {/* Familia */}
-                <div className="field-group"><label className="label">Familia de Producto</label>
-                  <select value={returnForm.familia} onChange={(e) => setReturnForm({...returnForm, familia: e.target.value})}>
-                    <option value="">Selecciona una familia...</option>
-                    {catalogs.familias.map(f => <option key={f.id} value={f.id}>{f.nombre || f.nombre || f.descripcion || f.Descripcion}</option>)}
+                {/* Motivo */}
+                <div className="field-group"><label className="label">Motivo de Devolución</label>
+                  <select value={returnForm.motivo} onChange={(e) => setReturnForm({...returnForm, motivo: e.target.value, estadoEmbalaje: '', armado: '', tipoEmbalaje: '', condiciones: []})}>
+                    <option value="">Selecciona un motivo...</option>
+                    {getAvailableOptions('motivo').map(m => <option key={m.id} value={m.id}>{m.nombre || m.descripcion || m.Descripcion}</option>)}
                   </select>
                 </div>
 
                 {/* Estado Embalaje */}
                 <div className="field-group"><label className="label">Estado del Embalaje</label>
-                  <select value={returnForm.estadoEmbalaje} onChange={(e) => setReturnForm({...returnForm, estadoEmbalaje: e.target.value})}>
+                  <select value={returnForm.estadoEmbalaje} onChange={(e) => setReturnForm({...returnForm, estadoEmbalaje: e.target.value, armado: '', tipoEmbalaje: '', condiciones: []})}>
                     <option value="">Selecciona un estado...</option>
-                    {catalogs.estadosEmbalaje.map(e => <option key={e.id} value={e.id}>{e.nombre || e.nombre || e.descripcion || e.Descripcion}</option>)}
+                    {getAvailableOptions('estadoEmbalaje').map(e => <option key={e.id} value={e.id}>{e.nombre || e.descripcion || e.Descripcion}</option>)}
                   </select>
                 </div>
 
                 {/* Armado (Condicional: Solo Muebles) */}
                 {catalogs.familias.find(f => f.id.toString() === returnForm.familia)?.nombre === 'Mueble' && (
                   <div className="field-group"><label className="label">Armado</label>
-                    <select value={returnForm.armado} onChange={(e) => setReturnForm({...returnForm, armado: e.target.value})}>
+                    <select value={returnForm.armado} onChange={(e) => setReturnForm({...returnForm, armado: e.target.value, tipoEmbalaje: '', condiciones: []})}>
                       <option value="">Selecciona...</option>
-                      {catalogs.armado.map(a => <option key={a.id} value={a.id}>{a.nombre || a.nombre || a.descripcion || a.Descripcion}</option>)}
+                      {getAvailableOptions('armado').map(a => <option key={a.id} value={a.id}>{a.nombre || a.descripcion || a.Descripcion}</option>)}
                     </select>
                   </div>
                 )}
@@ -455,7 +504,7 @@ function App() {
                 <div className="field-group"><label className="label">Tipo de Embalaje</label>
                   <select value={returnForm.tipoEmbalaje} onChange={(e) => setReturnForm({...returnForm, tipoEmbalaje: e.target.value})}>
                     <option value="">Selecciona un tipo...</option>
-                    {catalogs.tiposEmbalaje.map(t => <option key={t.id} value={t.id}>{t.nombre || t.nombre || t.descripcion || t.Descripcion}</option>)}
+                    {getAvailableOptions('tipoEmbalaje').map(t => <option key={t.id} value={t.id}>{t.nombre || t.descripcion || t.Descripcion}</option>)}
                   </select>
                 </div>
 
@@ -463,7 +512,7 @@ function App() {
                 <div className="field-group">
                   <label className="label">Condición del Producto</label>
                   <div className="checkbox-grid">
-                    {catalogs.condiciones.map(c => (
+                    {getAvailableOptions('condiciones').map(c => (
                       <label key={c.id} className="checkbox-item">
                         <input type="checkbox" checked={returnForm.condiciones.includes(c.id)} 
                           onChange={(e) => {
@@ -473,7 +522,7 @@ function App() {
                             setReturnForm({...returnForm, condiciones: newConds});
                           }} 
                         />
-                        <span>{c.nombre || c.nombre || c.descripcion || c.Descripcion}</span>
+                        <span>{c.nombre || c.descripcion || c.Descripcion}</span>
                       </label>
                     ))}
                   </div>
