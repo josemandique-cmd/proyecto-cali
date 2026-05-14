@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from './supabaseClient';
 import { CheckCircle2, Truck, AlertCircle, Check, X, ArrowRight, Search, FileText, PlusCircle, MapPin, Calendar, Image as ImageIcon, PackageCheck, Undo2 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
 import icon from 'leaflet/dist/images/marker-icon.png';
