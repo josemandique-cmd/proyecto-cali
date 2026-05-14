@@ -53,6 +53,7 @@ function App() {
     estadoEmbalaje: '',
     armado: '',
     tipoEmbalaje: '',
+    tipoLi: '',
     condiciones: []
   });
   const [catalogs, setCatalogs] = useState({
@@ -61,7 +62,8 @@ function App() {
     estadosEmbalaje: [],
     armado: [],
     tiposEmbalaje: [],
-    condiciones: []
+    condiciones: [],
+    tiposLi: []
   });
   const [rulesMatrix, setRulesMatrix] = useState([]);
   const [familyConditions, setFamilyConditions] = useState([]);
@@ -110,7 +112,8 @@ function App() {
           supabase.from('MA_TIPO_EMBALAJE').select('*'),
           supabase.from('MA_CONDICIONES_PRODUCTO').select('*'),
           supabase.from('RL_MATRIZ_PROD_DEV').select('*'),
-          supabase.from('RL_FAMILA_CONDICION').select('*')
+          supabase.from('RL_FAMILA_CONDICION').select('*'),
+          supabase.from('MA_TIPO_LI').select('*')
         ]);
 
         setCatalogs({
@@ -119,7 +122,8 @@ function App() {
           estadosEmbalaje: estados || [],
           armado: armado || [],
           tiposEmbalaje: tipos || [],
-          condiciones: condiciones || []
+          condiciones: condiciones || [],
+          tiposLi: tipoLi || []
         });
         setRulesMatrix(rules || []);
         setFamilyConditions(famCond || []);
@@ -139,6 +143,7 @@ function App() {
       case 'armado': return catalogs.armado;
       case 'tipoEmbalaje': return catalogs.tiposEmbalaje;
       case 'condiciones': return catalogs.condiciones;
+      case 'tipoLi': return catalogs.tiposLi;
       default: return [];
     }
   };
@@ -350,6 +355,7 @@ function App() {
       if (returnForm.estadoEmbalaje) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 9, DESCRIPCION: 'ESTADO_EMBALAJE', VALOR: returnForm.estadoEmbalaje, confirmacion: now, created_at: now, modificacion: now });
       if (returnForm.armado) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 10, DESCRIPCION: 'ARMADO', VALOR: returnForm.armado, confirmacion: now, created_at: now, modificacion: now });
       if (returnForm.tipoEmbalaje) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 11, DESCRIPCION: 'TIPO_EMBALAJE', VALOR: returnForm.tipoEmbalaje, confirmacion: now, created_at: now, modificacion: now });
+      if (returnForm.tipoLi) inserts.push({ OF: parseInt(ofNumber), TIPO_CAMPO: 13, DESCRIPCION: 'TIPO_DEVOLUCION', VALOR: returnForm.tipoLi, confirmacion: now, created_at: now, modificacion: now });
       
       if (returnForm.condiciones.length > 0) {
         inserts.push({ 
@@ -435,6 +441,14 @@ function App() {
               <motion.form key="ret1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onSubmit={handleSubmitReturn}>
                 <div className="info-box">OF: {ofNumber}</div>
                 
+                {/* Tipo de Devolución */}
+                <div className="field-group"><label className="label">Tipo de Devolución</label>
+                  <select value={returnForm.tipoLi} onChange={(e) => setReturnForm({...returnForm, tipoLi: e.target.value})}>
+                    <option value="">Selecciona tipo...</option>
+                    {getAvailableOptions('tipoLi').map(t => <option key={t.id} value={t.id}>{t.descripcion || t.Descripcion}</option>)}
+                  </select>
+                </div>
+
                 {/* Familia */}
                 <div className="field-group"><label className="label">Familia de Producto</label>
                   <select value={returnForm.familia} onChange={(e) => setReturnForm({...returnForm, familia: e.target.value})}>
